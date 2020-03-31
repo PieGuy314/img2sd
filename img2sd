@@ -1,0 +1,68 @@
+#!/bin/bash
+
+#
+# Write a disk image to a removable block device (SD Card/etc.)
+#
+
+usage() {
+    echo "Usage: sudo $(basename $0) -i image -d device [-f]"
+    echo
+    echo "  -i image    disk image (eg. something.img)"
+    echo "  -d device   target block device (eg. /dev/sda)"
+    echo "  -f          automatically unmount partitions on target"
+    echo
+}
+
+[ "$(id -u)" -ne 0 ] && usage && exit 1
+
+env -i
+
+#Parse the command line
+while getopts "i:d:f" opt; do
+	case "$opt" in
+		i)
+			IMAGE=$OPTARG
+			;;
+		d)
+			DEV=$(basename $OPTARG)
+			;;
+		f)
+			FORCE=1
+			;;
+		*)
+			usage
+			exit 1
+			;;
+	esac
+done
+
+# Check for mandatory command line options
+[ -z $IMAGE ] || [ -z $DEV ] && usage && exit 1
+
+# Verify image exists
+[ -f "${IMAGE}" ] || echo "Image not found." || exit 1
+
+# Verify that target is a block device and not a partition
+[ "$(lsblk | awk '{print $1}' | grep "^${DEV}$")" != "${DEV}" ] && echo "Invalid block device." && exit 1
+
+# Partitions on target need to be unmounted before proceeding
+if [ "$(df | awk '{print $1}' | grep "^/dev/${DEV}")" ]; then
+	if [ -z $FORCE ]; then
+		echo -e "Umount partitions on block device '/dev/${DEV}'. \n(Or use '-f' command line option.)"
+		exit 1
+	else
+		echo -n "Automatically umounting partition(s)..."
+		for partition in $(df | awk '{print $1}' | grep "^/dev/${DEV}"); do
+			echo -n " $partition"
+			umount $partition
+		done
+		echo -e ".\n"
+	fi
+fi
+
+echo "You are about to write '${IMAGE}' to block device '/dev/${DEV}'."
+read -s -p "Press ENTER to proceed or CTRL-C to quit... " REPLY
+echo
+
+# Write image
+dd bs=4M if=${IMAGE} of=/dev/${DEV} status=progress conv=fsync
