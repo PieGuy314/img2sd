@@ -60,7 +60,7 @@ if [ "$(df | awk '{print $1}' | grep "^/dev/${DEV}")" ]; then
 	fi
 fi
 
-echo "You are about to write '${IMAGE}' to block device '/dev/${DEV}'."
+echo "You are about to write '${IMAGE}' to block device '/dev/${DEV}'." | fmt -s
 read -s -p "Press ENTER to proceed or CTRL-C to quit... " REPLY
 echo
 
